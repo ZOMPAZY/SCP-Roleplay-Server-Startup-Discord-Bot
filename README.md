@@ -1,15 +1,16 @@
-<h1 align="center">🤖 SCP: Roleplay Server Startup Discord Bot</h1>
+<h1 align="center">🤖 SCP: Roleplay Server Startup Discord Bot v2.1.3</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-VOSL%202.3-7b42f6?style=flat&logoColor=white" alt="License">
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/discord.py-2.3.2-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord.py">
+  <img src="https://img.shields.io/badge/Bot%20Version-2.1.3-brightgreen?style=flat&logo=github" alt="Bot Version">
   <img src="https://img.shields.io/github/stars/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Stars">
   <img src="https://img.shields.io/github/issues/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Issues">
 </p>
 
 <p align="center">
-  A feature-rich Discord bot to display <b>Server Start Ups</b>, <b>Shutdowns</b>, and <b>Startup Polls</b> for an custom SCP:Roleplay Server<br>
+  A feature-rich Discord bot to display <b>Server Start Ups</b>, <b>Shutdowns</b>, and <b>Startup Polls</b> for a custom SCP:Roleplay Server.<br>
   Built with <a href="https://discordpy.readthedocs.io">discord.py</a>.
 </p>
 
@@ -54,7 +55,7 @@ cd yourrepo
 ```bash
 python -m venv venv
 source venv/bin/activate   # On Linux/Mac
-venv\\Scripts\\activate      # On Windows
+venv\Scripts\activate      # On Windows
 ```
 
 ### 3. Install Dependencies
