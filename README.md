@@ -1,7 +1,9 @@
 <h1 align="center">🤖 SCP: Roleplay Server Startup Discord Bot</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-VOSL%202.3-7b42f6?style=flat&logoColor=white" alt="License">
+  <a href="https://github.com/USERNAME/REPO/blob/main/LICENSE" target="_blank">
+    <img src="https://img.shields.io/badge/License-VOSL%202.3-7b42f6?style=flat&logoColor=white" alt="License">
+  </a>
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/discord.py-2.3.2-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord.py">
   <img src="https://img.shields.io/badge/Bot%20Version-2.1.3-brightgreen?style=flat&logo=github" alt="Bot Version">
