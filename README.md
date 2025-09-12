@@ -95,7 +95,7 @@ python main.py
 ## ⚙️ Configuration
 
 * `!config` → View current settings in an embed.
-* `!config ssu_channel <channel_id>` → Set SSU channel.
+* `!config ssu_channel <channel_id>` or `!config ssu_channel #channel_name` → Set SSU channel.
 * `!config ssd_channel <channel_id>` → Set SSD channel.
 * `!config ssup_channel <channel_id>` → Set SSUP channel.
 * `!config add_role @RoleName` → Allow role to use commands.
@@ -140,5 +140,5 @@ Distributed under the **VOSL 2.3 / Veilaris Open Source License 2.3**. See [`LIC
 ## 💡 Credits
 
 Veilaris / zюяатн zуяяан
-Developed for **SCP: Roleplay Community Server Management**
+Developed for **SCP: Roleplay Custom Server Community**
 Built with ❤️ using **Python** + **discord.py**
