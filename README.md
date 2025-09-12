@@ -46,8 +46,8 @@
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/yourrepo.git
-cd yourrepo
+git clone https://github.com/ZOMPAZY/SCP-Roleplay-Server-Startup-Discord-Bot.git
+cd SCP-Roleplay-Server-Startup-Discord-Bot
 ```
 
 ### 2. Create a Virtual Environment (recommended)
