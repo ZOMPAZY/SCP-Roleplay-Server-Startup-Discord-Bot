@@ -1,0 +1,132 @@
+=============================================================
+Veilaris Revocable Open Source License (VROSL) 1.2
+=============================================================
+
+Copyright © 2025 Veilaris / Veilaris Management System
+All rights reserved.
+
+This License is a legal agreement between Veilaris ("Licensor") and any individual or entity that chooses to use, copy, modify, distribute, or otherwise interact with the source code and associated files provided under this License (the "Software"). 
+By accessing, installing, copying, modifying, or using the Software, you ("Licensee") agree to be bound by all terms of this License. If you do not agree, do not use or access the Software.
+
+=============================================================
+1. License Grant
+=============================================================
+
+The Licensor grants the Licensee a worldwide, non-exclusive, revocable license to use, copy, modify, and distribute the Software, subject to the terms of this License. 
+This license is granted **only for the duration that the Licensee complies with all terms** of this License. All rights not explicitly granted remain with the Licensor.
+
+=============================================================
+2. Revocation
+=============================================================
+
+The Licensor reserves the right, at its sole discretion, to **suspend, revoke, or terminate** this license at any time, for any reason or no reason, with or without notice. 
+Upon revocation, the Licensee must immediately cease all use of the Software, delete or destroy all copies in their possession or control, and certify such deletion to the Licensor upon request. 
+Revocation also applies to any derivative or modified versions of the Software created or distributed by the Licensee.
+
+=============================================================
+3. Conditions for Use
+=============================================================
+
+Licensee may:
+
+- Use, copy, modify, and distribute the Software for personal, educational, or commercial purposes, as long as all terms of this License are followed.  
+- Create derivative works, provided that all copyright notices and this License remain intact in the derivative work.  
+
+Licensee may NOT:
+
+- Remove, alter, or obscure copyright, trademark, or license notices.  
+- Attempt to bypass or circumvent revocation of this license.  
+- Use the Software in violation of applicable law.  
+- Distribute modified or derivative works without retaining this License in full.  
+
+=============================================================
+4. Derivative Works / Copyleft with Revocation
+=============================================================
+
+Any derivative, modified, or redistributed version of the Software:
+
+- Must retain the original copyright notice and this License in full.  
+- Remains fully subject to **all rights and revocation powers of the Licensor**.  
+- May be revoked, taken down, or otherwise restricted at the Licensor’s sole discretion.  
+
+**Licensor Use of Derivatives:**  
+The Licensor reserves the right to **use, display, copy, or distribute any derivative or modified versions created by Licensees** for any purpose, including but not limited to advertising, promotion, showcase, or internal testing, without additional permission or compensation to the Licensee.  
+
+This ensures that all copies, modified or unmodified, **remain bound by this License**, and that the Licensor maintains full control over usage and enforcement.
+
+=============================================================
+5. Minor Use
+=============================================================
+
+Licensees under the age of 18 may use the Software and create derivative works **without guardian consent**, provided all use is personal, educational, or non-commercial.  
+All rights of revocation, enforcement, and restrictions apply to minors exactly as they do for adults.  
+Any violation by a minor is treated as a full breach, and the Licensor may enforce remedies directly or through a guardian.
+
+=============================================================
+6. Audit Rights
+=============================================================
+
+The Licensor may, at reasonable notice, audit the Licensee’s use of the Software and any derivative works to ensure compliance with this License.  
+Failure to cooperate constitutes a material breach of the License.
+
+=============================================================
+7. Indemnification
+=============================================================
+
+The Licensee agrees to indemnify, defend, and hold harmless the Licensor from any claims, damages, or liabilities arising from use, misuse, or distribution of the Software or derivative works. This includes reasonable attorney fees and any enforcement costs.
+
+=============================================================
+8. Termination
+=============================================================
+
+This License remains in effect until terminated.  
+The Licensor may terminate this License immediately, without prior notice, for any breach of the License, including violation of derivative work rules.  
+Upon termination, all copies and derivatives must be immediately deleted or destroyed.
+
+=============================================================
+9. Liquidated Damages
+=============================================================
+
+Unauthorized distribution, sharing, or modification in violation of this License may entitle the Licensor to liquidated damages of not less than €5,000 per violation, in addition to any actual damages, enforcement costs, or attorney fees.
+
+=============================================================
+10. No Warranty
+=============================================================
+
+The Software and any derivative works are provided "as is" without warranty of any kind. The Licensor disclaims all express and implied warranties, including merchantability, fitness for a particular purpose, and non-infringement.
+
+=============================================================
+11. Limitation of Liability
+=============================================================
+
+Under no circumstances shall the Licensor be liable for any direct, indirect, incidental, or consequential damages arising from the use, modification, or distribution of the Software or derivative works.
+
+=============================================================
+12. Export Control
+=============================================================
+
+The Licensee agrees to comply with all applicable export control laws and regulations.
+
+=============================================================
+13. Governing Law
+=============================================================
+
+This License is governed by the laws of Germany, including federal laws and the laws of North Rhine-Westphalia (NRW).  
+Licensee agrees to submit to the exclusive jurisdiction of courts in NRW for disputes under this License.
+
+=============================================================
+14. Severability
+=============================================================
+
+If any provision is deemed invalid or unenforceable, it shall be severed, and all remaining provisions remain in full effect.
+
+=============================================================
+15. Entire Agreement
+=============================================================
+
+This License constitutes the entire agreement between Licensor and Licensee regarding the Software and any derivative works.  
+It supersedes all prior agreements, oral or written, relating to the subject matter.
+
+=============================================================
+END OF LICENSE
+=============================================================
