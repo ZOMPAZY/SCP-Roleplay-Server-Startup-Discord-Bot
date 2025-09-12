@@ -4,12 +4,12 @@
   <img src="https://img.shields.io/badge/License-VOSL%202.3-7b42f6?style=flat&logoColor=white" alt="License">
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/discord.py-2.3.2-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord.py">
-  <img src="https://img.shields.io/github/stars/yourusername/yourrepo?style=flat&logo=github" alt="Stars">
-  <img src="https://img.shields.io/github/issues/yourusername/yourrepo?style=flat&logo=github" alt="Issues">
+  <img src="https://img.shields.io/github/stars/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Stars">
+  <img src="https://img.shields.io/github/issues/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Issues">
 </p>
 
 <p align="center">
-  A feature-rich Discord bot to manage <b>Server Start Ups</b>, <b>Shutdowns</b>, and <b>Startup Polls</b> for SCP: Roleplay communities.<br>
+  A feature-rich Discord bot to display <b>Server Start Ups</b>, <b>Shutdowns</b>, and <b>Startup Polls</b> for an custom SCP:Roleplay Server<br>
   Built with <a href="https://discordpy.readthedocs.io">discord.py</a>.
 </p>
 
