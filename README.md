@@ -1,4 +1,4 @@
-<h1 align="center">🤖 SCP: Roleplay Server Startup Discord Bot v2.1.3</h1>
+<h1 align="center">🤖 SCP: Roleplay Server Startup Discord Bot</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-VOSL%202.3-7b42f6?style=flat&logoColor=white" alt="License">
