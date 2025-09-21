@@ -6,7 +6,7 @@
   </a>
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/discord.py-2.3.2-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord.py">
-  <img src="https://img.shields.io/badge/Bot%20Version-2.1.3-brightgreen?style=flat&logo=github" alt="Bot Version">
+  <img src="https://img.shields.io/badge/Bot%20Version-2.2.1-brightgreen?style=flat&logo=github" alt="Bot Version">
   <img src="https://img.shields.io/github/stars/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Stars">
   <img src="https://img.shields.io/github/issues/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Issues">
 </p>
