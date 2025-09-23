@@ -6,7 +6,7 @@
   </a>
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/discord.py-2.3.2-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord.py">
-  <img src="https://img.shields.io/badge/Bot%20Version-2.2.1-brightgreen?style=flat&logo=github" alt="Bot Version">
+  <img src="https://img.shields.io/badge/Bot%20Version-2.2.3-brightgreen?style=flat&logo=github" alt="Bot Version">
   <img src="https://img.shields.io/github/stars/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Stars">
   <img src="https://img.shields.io/github/issues/zompazy/SCP-Roleplay-Server-Startup-Discord-Bot?style=flat&logo=github" alt="Issues">
 </p>
@@ -40,6 +40,13 @@
 * 📂 **Persistent storage** for SSU history and active polls.
 * ⚙️ **In-Discord configuration** (`!config`) for channels and roles.
 * 🛡️ **Role-based permissions** to restrict sensitive commands.
+* 🔄 **REST API Integration**:
+  * Full server management via HTTP endpoints
+  * Role management and configuration
+  * Poll creation and management
+  * Secure authentication system
+  * Comprehensive error handling
+  * Rate limiting and protection
 
 ---
 
@@ -97,6 +104,7 @@ python main.py
 
 ## ⚙️ Configuration
 
+### Discord Commands
 * `!config` → View current settings in an embed.
 * `!config ssu_channel <channel_id>` or `!config ssu_channel #channel_name` → Set SSU channel.
 * `!config ssd_channel <channel_id>` → Set SSD channel.
@@ -104,6 +112,31 @@ python main.py
 * `!config add_role @RoleName` → Allow role to use commands.
 * `!config remove_role @RoleName` → Remove role access.
 * `!config clear_roles` → Allow everyone to use commands.
+
+### API Configuration
+The bot now includes a REST API for programmatic control. See [`API_DOCS.md`](API_DOCS.md) for full details.
+
+```bash
+# API Base URL
+http://localhost:8000
+
+# Available Endpoints
+POST /ssu                # Start a server
+POST /ssd                # Shutdown server
+POST /ssup               # Create startup poll
+GET  /status             # Get server status
+GET  /polls/active       # List active polls
+POST /roles/manage       # Manage roles
+POST /config/update      # Update configuration
+```
+
+Default API port is 8000 but can be configured in `config.json`:
+```json
+{
+  "api_host": "0.0.0.0",
+  "api_port": 8000
+}
+```
 
 ---
 
@@ -130,7 +163,39 @@ python main.py
 
 ## 🚀 Roadmap
 
-Coming soon...
+### Upcoming Features ( Not Confirmed )
+
+1. 🌐 **Web Dashboard**
+   - Modern web interface for bot management
+   - Live server status monitoring
+   - Real-time SSU/SSD tracking
+   - Visual configuration tools
+   - Analytics and statistics dashboard
+
+2. 🎨 **Customizable Embeds**
+   - Template system with dynamic placeholders:
+     - `{host}` - Server host name
+     - `{server}` - Server name
+     - `{time}` - Current time/duration
+     - `{status}` - Server status
+     - `{description}` - Event description
+   - Custom color schemes
+   - Configurable embed layouts
+   - Save and load embed templates
+
+3. 🌍 **Multi-Language Support**
+   - Support for multiple languages
+   - Easy language switching via commands
+   - Community-driven translations
+   - Region-specific time formats
+   - Localized error messages
+
+4. ⚡ **Performance Optimizations**
+   - Improved response times
+   - Reduced memory usage
+   - Better handling of concurrent commands
+   - Optimized database operations
+   - Enhanced poll update efficiency
 
 ---
 
