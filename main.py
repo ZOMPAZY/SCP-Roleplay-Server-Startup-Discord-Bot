@@ -1861,7 +1861,7 @@ async def help_command(ctx):
         inline=False
     )
     
-    embed.set_footer(text="Veilairs Server Management Bot v1.7.1")
+    embed.set_footer(text="Veilairs Server Management Bot v2.2.3")
     
     await ctx.send(embed=embed)
 
@@ -1903,3 +1903,4 @@ if __name__ == "__main__":
         except Exception as e:
             logging.error(f"Failed to start bot: {e}")
             print(f"Failed to start bot: {e}")
+
